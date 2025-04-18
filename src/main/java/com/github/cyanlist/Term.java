@@ -1,21 +1,12 @@
 package com.github.cyanlist;
 
-import java.util.Map;
+import java.util.Set;
 
-public abstract class Term {
+public sealed interface Term permits Variable, Constant, Function {
 
-    protected String name;
+    /** Wendet die Substitution σ auf diesen Term an und liefert einen neuen Term zurück. */
+    Term apply(Substitution σ);
 
-    public Term(String name) {
-        this.name = name;
-    }
-
-    public String getName() {
-        return this.name;
-    }
-
-    @Override
-    public String toString() {
-        return this.getName();
-    }
+    /** Liefert alle Variablen, die in diesem Term vorkommen (für Occurs‑Check). */
+    Set<Variable> vars();
 }

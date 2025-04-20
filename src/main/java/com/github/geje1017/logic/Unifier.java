@@ -9,13 +9,10 @@ import java.util.*;
 
 /**
  * Führt die Unifikation (Most‑General Unifier) über ein Gleichungssystem durch.
+ * Zeichnet jeden Schritt im Trace auf und liefert ihn in UnifyResult zurück.
  */
 public abstract class Unifier {
 
-    /**
-     * Exception, die geworfen wird, wenn im Unifikationsprozess
-     * ein Clash (Unvereinbarkeit) auftritt.
-     */
     public static class ClashException extends Exception {
         public ClashException(String message) {
             super(message);
@@ -23,56 +20,64 @@ public abstract class Unifier {
     }
 
     /**
-     * Berechnet den most‑general unifier für eine Menge von Gleichungen.
+     * Berechnet den most‑general unifier für eine Menge von Gleichungen
+     * und erzeugt einen Trace aller angewendeten Regeln.
      *
      * @param equations die Ausgangs‑Gleichungen
-     * @return {@link UnifyResult#success(Substitution)} bei Erfolg,
-     *         sonst {@link UnifyResult#failure()}
+     * @return UnifyResult mit Substitution und Schritt‑für‑Schritt‑Trace
      */
     public static UnifyResult unify(Collection<Equation> equations) {
         Deque<Equation> equationsToBeChecked = new ArrayDeque<>(equations);
         Substitution substitutionTable = new Substitution();
+        List<String> trace = new ArrayList<>();
 
         try {
             while (!equationsToBeChecked.isEmpty()) {
-                process(equationsToBeChecked, substitutionTable);
+                process(equationsToBeChecked, substitutionTable, trace);
             }
-            return UnifyResult.success(substitutionTable);
+            return UnifyResult.success(substitutionTable, trace);
         } catch (ClashException e) {
-            return UnifyResult.failure();
+            trace.add("CLASH: " + e.getMessage());
+            return UnifyResult.failure(trace);
         }
     }
-
-    // TODO: Pattern Matching herausfinden
 
     /**
      * Dispatcher für die fünf Unifikationsregeln.
      *
-     * @param work         Stapel der noch zu bearbeitenden Gleichungen
-     * @param substitution aktuelle Substitutionstabelle
-     * @throws ClashException bei Regel (5) oder Occurs‑Check‑Fehler
+     * @param work               Stapel der noch zu bearbeitenden Gleichungen
+     * @param substitution       aktuelle Substitutionstabelle
+     * @param trace              Liste zur Aufzeichnung der Schritte
+     * @throws ClashException   bei Regel (5) oder Occurs‑Check‑Fehler
      */
     private static void process(Deque<Equation> work,
-                                Substitution substitution) throws ClashException {
-
+                                Substitution substitution,
+                                List<String> trace) throws ClashException {
         Equation equation = work.pop();
         Term leftTerm  = equation.left().instantiatedWith(substitution);
         Term rightTerm = equation.right().instantiatedWith(substitution);
 
+        trace.add("Verarbeite Gleichung: " + leftTerm + " ≐ " + rightTerm);
+
         if (isDelete(leftTerm, rightTerm)) {
+            trace.add("  → DELETE");
             handleDelete();
         }
         else if (isSwap(leftTerm, rightTerm)) {
+            trace.add("  → SWAP");
             handleSwap(leftTerm, rightTerm, work);
         }
         else if (isEliminate(leftTerm)) {
+            trace.add("  → ELIMINATE: " + leftTerm + " ↦ " + rightTerm);
             handleEliminate((Variable) leftTerm, rightTerm, substitution);
         }
         else if (isDecompose(leftTerm, rightTerm)) {
+            trace.add("  → DECOMPOSE");
             handleDecompose((Function) leftTerm, (Function) rightTerm, work);
         }
         else {
-            handleClash(leftTerm, rightTerm);
+            // CLASH
+            throw new ClashException(leftTerm + " und " + rightTerm + " sind nicht unifizierbar");
         }
     }
 
@@ -83,7 +88,7 @@ public abstract class Unifier {
 
     /** DELETE‑Regel: nichts tun. */
     private static void handleDelete() {
-        // symbolisch; nichts zu tun hier
+        // No-op
     }
 
     /** SWAP/ORIENT, true wenn links kein Variable und rechts eine Variable ist. */
@@ -92,7 +97,7 @@ public abstract class Unifier {
     }
 
     /**
-     * SWAP/ORIENT‑Regel: tauscht Termpaar.
+     * SWAP/ORIENT‑Regel: tauscht Term‑Paar.
      */
     private static void handleSwap(Term left, Term right, Deque<Equation> work) {
         work.push(new Equation(right, left));
@@ -108,7 +113,9 @@ public abstract class Unifier {
      *
      * @throws ClashException wenn Occurs‑Check fehlschlägt
      */
-    private static void handleEliminate(Variable variable, Term term, Substitution substitution) throws ClashException {
+    private static void handleEliminate(Variable variable,
+                                        Term term,
+                                        Substitution substitution) throws ClashException {
         checkOccurrence(variable, term);
         substitution.put(variable, term);
     }
@@ -123,7 +130,9 @@ public abstract class Unifier {
     /**
      * DECOMPOSE‑Regel: zerlegt kompatible Funktionen in Argument‑Gleichungen.
      */
-    private static void handleDecompose(Function leftFunction, Function rightFunction, Deque<Equation> equations) {
+    private static void handleDecompose(Function leftFunction,
+                                        Function rightFunction,
+                                        Deque<Equation> equations) {
         for (int i = 0; i < leftFunction.getArity(); i++) {
             equations.push(new Equation(
                     leftFunction.getArgumentOnPosition(i),
@@ -133,22 +142,17 @@ public abstract class Unifier {
     }
 
     /**
-     * CLASH: keine Regel anwendbar → Fehler.
-     *
-     * @throws ClashException immer
-     */
-    private static void handleClash(Term left, Term right) throws ClashException {
-        throw new ClashException(left + " und " + right + " sind nicht unfizierbar");
-    }
-
-    /**
      * Führt den Occurs‑Check durch und wirft bei Zirkularität eine Exception.
      *
      * @throws ClashException wenn variable in term enthalten ist
      */
-    private static void checkOccurrence(Variable variable, Term term) throws ClashException {
+    private static void checkOccurrence(Variable variable,
+                                        Term term) throws ClashException {
         if (term.getContainedVariables().contains(variable)) {
-            throw new ClashException("Occurs‑Check fehlgeschlagen: " + variable + " kommt in " + term + " vor");
+            throw new ClashException(
+                    "Occurs‑Check fehlgeschlagen: " +
+                            variable + " kommt in " + term + " vor"
+            );
         }
     }
 }

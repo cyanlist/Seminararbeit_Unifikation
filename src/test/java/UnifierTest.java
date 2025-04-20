@@ -1,12 +1,9 @@
 import com.github.geje1017.logic.Substitution;
-import com.github.geje1017.logic.UnifierTrace;
 import com.github.geje1017.term.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 // TODO: Besser Dokumentieren
 // TODO: Ergänzen

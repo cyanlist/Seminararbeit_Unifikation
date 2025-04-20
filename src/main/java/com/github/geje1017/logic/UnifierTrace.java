@@ -1,4 +1,9 @@
-package com.github.cyanlist;
+package com.github.geje1017.logic;
+
+import com.github.geje1017.term.Equation;
+import com.github.geje1017.term.Function;
+import com.github.geje1017.term.Term;
+import com.github.geje1017.term.Variable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,7 +18,7 @@ public final class UnifierTrace {
     public record Result(Optional<Substitution> mgu,
                          List<String> steps) {}
 
-    /** Öffentliche API: unify … und logge alle Schritte. */
+    /** unify und logge alle Schritte. */
     public static Result unifyTrace(Collection<Equation> startEqns) {
 
         Deque<Equation> γ = new ArrayDeque<>(startEqns);   // Arbeitsliste
@@ -33,8 +38,8 @@ public final class UnifierTrace {
 
         while (!γ.isEmpty()) {
             Equation e = γ.pop();
-            Term s = e.left().apply(σ);
-            Term t = e.right().apply(σ);
+            Term s = e.left().instantiatedWith(σ);
+            Term t = e.right().instantiatedWith(σ);
 
             /* 1. DELETE -------------------------------------------------- */
             if (s.equals(t)) {
@@ -53,7 +58,7 @@ public final class UnifierTrace {
 
             /* 3. ELIMINATE ---------------------------------------------- */
             if (s instanceof Variable X) {
-                if (t.vars().contains(X)) {
+                if (t.getContainedVariables().contains(X)) {
                     step++; log.add("-- Occurs‑Check FAIL  (%s ∈ %s)".formatted(X, t));
                     return new Result(Optional.empty(), log);
                 }
@@ -65,8 +70,8 @@ public final class UnifierTrace {
                 Substitution single = new Substitution();
                 single.put(X, t);
                 γ = γ.stream()
-                        .map(eq -> new Equation(eq.left().apply(single),
-                                eq.right().apply(single)))
+                        .map(eq -> new Equation(eq.left().instantiatedWith(single),
+                                eq.right().instantiatedWith(single)))
                         .collect(Collectors.toCollection(ArrayDeque::new));
 
                 dump.run();
@@ -75,11 +80,11 @@ public final class UnifierTrace {
 
             /* 4. DECOMPOSE ---------------------------------------------- */
             if (s instanceof Function f && t instanceof Function g &&
-                    f.functor().equals(g.functor()) && f.arity() == g.arity()) {
+                    f.getName().equals(g.getName()) && f.getArity() == g.getArity()) {
 
                 step++; log.add("-- Decompose  %s  vs  %s".formatted(f, g));
-                for (int i = 0; i < f.arity(); i++)
-                    γ.push(new Equation(f.arg(i), g.arg(i)));
+                for (int i = 0; i < f.getArity(); i++)
+                    γ.push(new Equation(f.getArgumentOnPosition(i), g.getArgumentOnPosition(i)));
                 dump.run();
                 continue;
             }

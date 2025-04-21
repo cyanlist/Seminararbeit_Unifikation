@@ -71,9 +71,11 @@ public abstract class Unifier {
             trace.add("  → ELIMINATE: " + leftTerm + " ↦ " + rightTerm);
             handleEliminate((Variable) leftTerm, rightTerm, substitution);
         }
-        else if (isDecompose(leftTerm, rightTerm)) {
+        else if (leftTerm instanceof Function lf && rightTerm instanceof Function rf) {
+            checkFunctionName(lf, rf);
+            checkFunctionArity(lf, rf);
             trace.add("  → DECOMPOSE");
-            handleDecompose((Function) leftTerm, (Function) rightTerm, work);
+            handleDecompose(lf, rf, work);
         }
         else {
             // CLASH
@@ -123,8 +125,7 @@ public abstract class Unifier {
     /** DECOMPOSE, true wenn beide Funktionen kompatibel sind. */
     private static boolean isDecompose(Term left, Term right) {
         return left instanceof Function lf
-                && right instanceof Function rf
-                && lf.isCompatibleWith(rf);
+                && right instanceof Function rf;
     }
 
     /**
@@ -155,4 +156,38 @@ public abstract class Unifier {
             );
         }
     }
+
+    /**
+     * Check: Funktionsnamen müssen identisch sein.
+     *
+     * @throws ClashException wenn die Namen unterschiedlich sind
+     */
+    private static void checkFunctionName(Function lf, Function rf) throws ClashException {
+        String nameL = lf.getName();
+        String nameR = rf.getName();
+        if (!nameL.equals(nameR)) {
+            throw new ClashException(
+                    "Funktionen haben unterschiedliche Namen: " +
+                            nameL + " vs. " + nameR
+            );
+        }
+    }
+
+    /**
+     * Check: Funktionsarikitäten (Wertigkeiten) müssen übereinstimmen.
+     *
+     * @throws ClashException wenn die Arity unterschiedlich sind
+     */
+    private static void checkFunctionArity(Function lf, Function rf) throws ClashException {
+        int arL = lf.getArity();
+        int arR = rf.getArity();
+        if (arL != arR) {
+            throw new ClashException(
+                    "Funktionen haben unterschiedliche Wertigkeiten: " +
+                            lf.getName() + "(" + arL + ") vs. " +
+                            rf.getName() + "(" + arR + ")"
+            );
+        }
+    }
+
 }

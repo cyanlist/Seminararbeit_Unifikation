@@ -13,8 +13,10 @@ public class Main {
         Term t3 = new Function("g", X);
 
         Term t1 = new Function("f", t3, X);
-        Term t2 = new Function("f", X, new Constant("a"));
+        Term t2 = new Function("g", X, new Constant("a"));
 
-        System.out.println(Unifier.unify(List.of(new Equation(t1, t2))));
+        Equation eq = new Equation(t1, t2);
+
+        System.out.println(Unifier.unify(List.of(eq)));
     }
 }

@@ -20,8 +20,7 @@ public class UnifyResult {
                         List<String> trace) {
         this.success = success;
         this.substitution = substitution;
-        // Unveränderliche Kopie, damit der Trace nicht nachträglich modifiziert wird
-        this.trace = Collections.unmodifiableList(new ArrayList<>(trace));
+        this.trace = List.copyOf(trace);
     }
 
     /**
@@ -63,11 +62,11 @@ public class UnifyResult {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("UnifyResult: ").append(success ? "SUCCESS" : "FAILURE").append("\n");
+        sb.append("UnifyResult: ").append(this.isSuccess() ? "SUCCESS" : "FAILURE").append("\n");
         sb.append("Substitution:\n");
-        sb.append("  ").append(substitution).append("\n");
+        sb.append("  ").append(this.getSubstitution()).append("\n");
         sb.append("Trace:\n");
-        for (String step : trace) {
+        for (String step : this.getTrace()) {
             sb.append("  - ").append(step).append("\n");
         }
         return sb.toString();

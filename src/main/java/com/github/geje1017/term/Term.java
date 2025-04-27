@@ -1,13 +1,25 @@
 package com.github.geje1017.term;
 
 import com.github.geje1017.logic.Substitution;
-
 import java.util.Set;
 
-// TODO: Doc-Kommentare hinzufügen
+/**
+ * Represents a term in the term algebra. A term can be a variable,
+ * a constant, or a function application.
+ */
 public sealed interface Term permits Variable, Constant, Function {
 
-    Term instantiatedWith(Substitution substitution);
+    /**
+     * Applies the given substitution to this term, returning a new term
+     * with all variables replaced according to the substitution.
+     * @param substitution the substitution to apply
+     * @return the term resulting from applying the substitution
+     */
+    Term instantiate(Substitution substitution);
 
+    /**
+     * Returns the set of variables contained in this term.
+     * @return an unmodifiable set of variables present in this term
+     */
     Set<Variable> getContainedVariables();
 }

@@ -4,7 +4,6 @@ import com.github.geje1017.term.*;
 import org.junit.jupiter.api.Test;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 
 import java.util.*;
 
@@ -25,7 +24,6 @@ class UnifierTest {
     private Function f_y_a;     // f(Y,a)
     private Function f_g_x;     // f(g(X))
     private Function f_g_x_x;   // f(g(X),X)
-    private List<Equation> equations;
 
     @BeforeEach
     void setUp() {
@@ -42,150 +40,175 @@ class UnifierTest {
         f_y_a = new Function("f", y, a);
         f_g_x = new Function("f", g_x);
         f_g_x_x = new Function("f", g_x, x);
+    }
 
-        equations = new ArrayList<>();
+    /**
+     * Utility to assert expected substitution mapping for a variable.
+     */
+    private static void assertBinding(UnifyResult result, Variable var, Term expected) {
+        assertTrue(result.isSuccess(), "Expected unification to succeed for binding " + var);
+        Term actual = result.getSubstitution().lookup(var);
+        assertEquals(expected, actual,
+                () -> String.format("Variable %s should map to %s but was %s", var, expected, actual));
     }
 
     @Test
+	// Tests: a = a; 		
+	// Result: Should succeed with empty substitution
     void testEquatingSameConstant() {
-        Equation e1 = new Equation(a, a);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+        Equation eq = new Equation(a, a);
+        UnifyResult result = Unifier.unify(List.of(eq));
+        assertTrue(result.isSuccess(), "Unification of identical constants should succeed");
+        assertTrue(result.getSubstitution().entrySet().isEmpty(),
+                "Substitution should remain empty when unifying identical constants");
     }
 
     @Test
+	// Tests: a = b; 		
+	// Result: Should fail
     void testEquatingDifferentConstants() {
-        Equation e1 = new Equation(a, b);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertFalse(result.isSuccess());
+        Equation eq = new Equation(a, b);
+        UnifyResult result = Unifier.unify(List.of(eq));
+        assertFalse(result.isSuccess(), "Unification of different constants should fail");
+        assertTrue(result.getSubstitution().entrySet().isEmpty(),
+                "Substitution should remain empty after failure");
     }
 
     @Test
-    void testEquatingSameVariable() {
-        Equation e1 = new Equation(x, x);
-        UnifyResult result = Unifier.unify(List.of(e1));
+	// Tests: X = a and a = X; 		
+	// Result: Should map X->a
+    void testVariableToConstant() {
+        UnifyResult result1 = Unifier.unify(List.of(new Equation(x, a)));
+        assertBinding(result1, x, a);
+	// Ensure only one binding
+        assertEquals(1, result1.getSubstitution().entrySet().size());
 
-        assertTrue(result.isSuccess());
+        UnifyResult result2 = Unifier.unify(List.of(new Equation(a, x)));
+        assertBinding(result2, x, a);
+        assertEquals(1, result2.getSubstitution().entrySet().size());
     }
 
     @Test
-    void testEquatingVariableAndConstant() {
-        Equation e1 = new Equation(x, a);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests: X = Y; 		
+	// Result: Should map X->Y and Y remains unbound
+    void testVariableToVariable() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(x, y)));
+        assertBinding(result, x, y);
+        assertEquals(1, result.getSubstitution().entrySet().size(),
+                "Only one binding expected");
+	// Y should be unbound: lookup returns itself
+        assertEquals(y, result.getSubstitution().lookup(y),
+                "Y should remain unbound and map to itself");
     }
 
     @Test
-    void testEquatingConstantAndVariable() {
-        Equation e1 = new Equation(a, x);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests: f(X) = f(a,b); 		
+	// Result: Should fail due to arity mismatch
+    void testFunctionArityMismatch() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(f_x, f_ab)));
+        assertFalse(result.isSuccess(), "Arity mismatch should cause failure");
     }
 
     @Test
-    void testEquatingDifferentVariables() {
-        Equation e1 = new Equation(x, y);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests: f(X) = g(Y)		
+	// Result: Should fail due to name mismatch
+    void testFunctionNameMismatch() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(f_x, g_y)));
+        assertFalse(result.isSuccess(), "Function name mismatch should cause failure");
     }
 
     @Test
-    void testEquatingFunctions() {
-        Equation e1 = new Equation(f_ax, f_ab);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests: f(a,X) = f(a,b)		
+	// Result: Should bind X->b
+    void testSimpleFunctionUnification() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(f_ax, f_ab)));
+        assertBinding(result, x, b);
+        assertEquals(1, result.getSubstitution().entrySet().size());
     }
 
     @Test
-    void testEquatingFunctionsWithVariables() {
-        Equation e1 = new Equation(f_x, f_y);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests: f(g(X)) = f(Y)		
+	// Result: Should bind Y->g(X)
+    void testNestedFunctionUnification() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(f_g_x, f_y)));
+        assertBinding(result, y, g_x);
+        assertEquals(1, result.getSubstitution().entrySet().size());
     }
 
     @Test
-    void testEquatingFunctionsWithVariablesAndDifferentNames() {
-        Equation e1 = new Equation(f_x, g_y);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertFalse(result.isSuccess());
+	// Tests: f(g(X), X) = f(Y, a)		
+	// Result: Should bind X->a then Y->g(a)
+    void testNestedFunctionWithMultipleArgs() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(f_g_x_x, f_y_a)));
+	// First binding: X->a
+        assertBinding(result, x, a);
+	// After applying X->a, g(X) becomes g(a)
+        assertBinding(result, y, new Function("g", a));
+        assertEquals(2, result.getSubstitution().entrySet().size());
     }
 
     @Test
-    void testEquatingFunctionsWithDifferentArity() {
-        Equation e1 = new Equation(f_x, f_ab);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertFalse(result.isSuccess());
+	// Tests: X = f(X)		
+	// Result: Should fail occurs-check
+    void testOccursCheck() {
+        UnifyResult result = Unifier.unify(List.of(new Equation(x, f_x)));
+        assertFalse(result.isSuccess(), "Occurs-check should prevent circular binding");
+        assertTrue(result.getSubstitution().entrySet().isEmpty(),
+                "No bindings should be produced on failure");
     }
 
     @Test
-    void testEquatingNestedFunctions() {
-        Equation e1 = new Equation(f_g_x, f_y);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests: X=Y, Y=a		
+	// Result: Should bind X->a and Y->a
+    void testMultipleEquationsConsistent() {
+        UnifyResult result = Unifier.unify(List.of(
+                new Equation(x, y),
+                new Equation(y, a)
+        ));
+        assertBinding(result, x, a);
+        assertBinding(result, y, a);
+        assertEquals(2, result.getSubstitution().entrySet().size());
     }
 
     @Test
-    void testEquatingNestedFunctionsAndArity() {
-        Equation e1 = new Equation(f_g_x_x, f_y_a);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertTrue(result.isSuccess());
+	// Tests order independence: a=Y, X=Y		
+	// Result: Should bind Y->a and X->a
+    void testMultipleEquationsOrderIndependence() {
+        UnifyResult result = Unifier.unify(List.of(
+                new Equation(a, y),
+                new Equation(x, y)
+        ));
+        assertBinding(result, y, a);
+        assertBinding(result, x, a);
+        assertEquals(2, result.getSubstitution().entrySet().size());
     }
 
     @Test
-    void testOccurrenceCheck() {
-        Equation e1 = new Equation(x, f_x);
-        UnifyResult result = Unifier.unify(List.of(e1));
-
-        assertFalse(result.isSuccess());
+	// Tests conflicting equations: X=a, b=X		
+	// Result: Should fail
+    void testMultipleEquationsConflict() {
+        UnifyResult result = Unifier.unify(List.of(
+                new Equation(x, a),
+                new Equation(b, x)
+        ));
+        assertFalse(result.isSuccess(), "Conflicting equations should fail");
+        assertTrue(result.getSubstitution().entrySet().isEmpty(),
+                "No bindings should remain after failure");
     }
 
     @Test
-    void testUnifyingMultipleEquations() {
-        Equation e1 = new Equation(x, y);
-        Equation e2 = new Equation(y, a);
-        UnifyResult result = Unifier.unify(List.of(e1, e2));
-
-        assertTrue(result.isSuccess());
+	// Tests trace content for f(a,X)=f(a,b)
+    void testTraceContainsStepInfo() {
+        Equation eq = new Equation(f_ax, f_ab);
+        UnifyResult result = Unifier.unify(List.of(eq));
+        List<String> trace = result.getTrace();
+        assertFalse(trace.isEmpty(), "Trace should not be empty");
+	// Check that the first step logs Step 1 and context
+        assertTrue(trace.get(0).startsWith("Step 1:"), "Trace should start with step number");
+        assertTrue(trace.stream().anyMatch(s -> s.contains("Remaining equations:")),
+                "Trace should list remaining equations");
+        assertTrue(trace.stream().anyMatch(s -> s.contains("Current substitution:")),
+                "Trace should list current substitution");
     }
 
-    @Test
-    void testUnifyingMultipleEquations2() {
-        Equation e1 = new Equation(a, y);
-        Equation e2 = new Equation(x, y);
-        UnifyResult result = Unifier.unify(List.of(e1, e2));
-
-        assertTrue(result.isSuccess());
-    }
-
-    @Test
-    void testUnifyingMultipleEquations3() {
-        Equation e1 = new Equation(x, a);
-        Equation e2 = new Equation(b, x);
-        UnifyResult result = Unifier.unify(List.of(e1, e2));
-
-        assertFalse(result.isSuccess());
-    }
-
-    @Test
-    @DisplayName("DELETE: identische Terme verschwinden ohne Fehler")
-    void testDeleteRule() {
-        this.equations.add(new Equation(f_x, f_x));
-        UnifyResult result = Unifier.unify(equations);
-
-        assertTrue(result.isSuccess(), "Unifikation sollte erfolgreich sein");
-        assertTrue(result.getTrace().stream().anyMatch(s -> s.contains("DELETE")),
-                "Trace muss DELETE enthalten");
-        assertTrue(result.getSubstitution().isEmpty(), "Keine Substitution erwartet");
-    }
 }

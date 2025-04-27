@@ -1,11 +1,16 @@
 package com.github.geje1017.term;
 
-// TODO: Doc-Kommentare hinzufügen
+/**
+ * Represents an equation between two terms, left = right.
+ */
 public record Equation(Term left, Term right) {
 
+    /**
+     * Returns a human-readable form "left = right".
+     * @return the string representation of the equation
+     */
     @Override
     public String toString() {
-        return this.left() + " = " + this.right();
+        return left + " = " + right;
     }
-
 }
